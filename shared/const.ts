@@ -1,2 +1,7 @@
-export const COOKIE_NAME = "app_session_id";
-export const ONE_YEAR_MS = 1000 * 60 * 60 * 24 * 365;
+/**
+ * Neutral application session cookie name reserved for the future provider-neutral
+ * session layer. This is not tied to Manus OAuth and is not used by the static
+ * prototype until the full-stack auth foundation is implemented.
+ */
+export const COOKIE_NAME = "trustee_session";
+export const ONE_YEAR_MS = 365 * 24 * 60 * 60 * 1000;
