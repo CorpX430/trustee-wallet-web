@@ -1,25 +1,217 @@
-import { Button } from "@/components/ui/button";
-import { Loader2 } from "lucide-react";
-import { Streamdown } from 'streamdown';
+import { useMemo, useState } from "react";
+import { toast } from "sonner";
+import type { LucideIcon } from "lucide-react";
+import {
+  ArrowDownLeft,
+  ArrowLeftRight,
+  ArrowRight,
+  ArrowUpRight,
+  Bell,
+  Bitcoin,
+  Check,
+  ChevronDown,
+  ChevronRight,
+  CircleHelp,
+  Copy,
+  Eye,
+  EyeOff,
+  Globe2,
+  Grid2X2,
+  History,
+  Landmark,
+  LockKeyhole,
+  Menu,
+  MoreHorizontal,
+  Plus,
+  QrCode,
+  Search,
+  Settings2,
+  ShieldCheck,
+  SlidersHorizontal,
+  Sparkles,
+  Star,
+  TrendingUp,
+  WalletCards,
+  X,
+  Zap,
+} from "lucide-react";
 
-/**
- * All content in this page are only for example, replace with your own feature implementation
- * When building pages, remember your instructions in Frontend Best Practices, Design Guide and Common Pitfalls
- */
-export default function Home() {
-  // If theme is switchable in App.tsx, we can implement theme toggling like this:
-  // const { theme, toggleTheme } = useTheme();
+type Tab = "overview" | "assets" | "swap" | "buy" | "activity" | "settings";
+type Modal = "send" | "receive" | "swap" | "buy" | "asset" | null;
 
+type Asset = {
+  id: string;
+  name: string;
+  symbol: string;
+  price: string;
+  value: string;
+  amount: string;
+  change: string;
+  color: string;
+  icon: string;
+  positive?: boolean;
+};
+
+const assets: Asset[] = [
+  { id: "btc", name: "Bitcoin", symbol: "BTC", price: "$68,432.18", value: "$25,184.60", amount: "0.3681 BTC", change: "+4.82%", color: "#f7931a", icon: "₿", positive: true },
+  { id: "eth", name: "Ethereum", symbol: "ETH", price: "$3,842.09", value: "$12,468.24", amount: "3.244 ETH", change: "+6.14%", color: "#8d8df4", icon: "◆", positive: true },
+  { id: "sol", name: "Solana", symbol: "SOL", price: "$186.22", value: "$6,218.79", amount: "33.39 SOL", change: "+12.38%", color: "#8b5cf6", icon: "≋", positive: true },
+  { id: "usdc", name: "USD Coin", symbol: "USDC", price: "$1.00", value: "$3,413.19", amount: "3,413.19 USDC", change: "+0.02%", color: "#2775ca", icon: "$", positive: true },
+  { id: "matic", name: "Polygon", symbol: "POL", price: "$0.72", value: "$1,288.44", amount: "1,789.50 POL", change: "−1.62%", color: "#8247e5", icon: "◇" },
+];
+
+const activity = [
+  { type: "Received", title: "Received ETH", detail: "From 0x71...a94d", time: "Today, 10:42 AM", amount: "+0.42 ETH", value: "+$1,613.68", color: "#8d8df4", icon: ArrowDownLeft },
+  { type: "Swapped", title: "Swapped SOL → USDC", detail: "Jupiter · Network fee $0.02", time: "Yesterday, 4:18 PM", amount: "−12.00 SOL", value: "+$2,231.18", color: "#8b5cf6", icon: ArrowLeftRight },
+  { type: "Sent", title: "Sent Bitcoin", detail: "To bc1q...8f2e", time: "May 24, 9:07 AM", amount: "−0.045 BTC", value: "−$3,054.40", color: "#f7931a", icon: ArrowUpRight },
+  { type: "Bought", title: "Bought USDC", detail: "Apple Pay · Completed", time: "May 21, 1:26 PM", amount: "+500 USDC", value: "+$500.00", color: "#2775ca", icon: Plus },
+];
+
+const navItems: { id: Tab; label: string; icon: LucideIcon }[] = [
+  { id: "overview", label: "Overview", icon: Grid2X2 },
+  { id: "assets", label: "My assets", icon: WalletCards },
+  { id: "swap", label: "Swap", icon: ArrowLeftRight },
+  { id: "buy", label: "Buy crypto", icon: Landmark },
+  { id: "activity", label: "Activity", icon: History },
+];
+
+function cx(...classes: Array<string | false | null | undefined>) {
+  return classes.filter(Boolean).join(" ");
+}
+
+function TokenIcon({ asset, size = "md" }: { asset: Asset; size?: "sm" | "md" | "lg" }) {
   return (
-    <div className="min-h-screen flex flex-col">
-      <main>
-        {/* Example: lucide-react for icons */}
-        <Loader2 className="animate-spin" />
-        Example Page
-        {/* Example: Streamdown for markdown rendering */}
-        <Streamdown>Any **markdown** content</Streamdown>
-        <Button variant="default">Example Button</Button>
-      </main>
+    <div
+      className={cx(
+        "grid shrink-0 place-items-center rounded-full font-semibold shadow-[inset_0_1px_1px_rgba(255,255,255,.22)]",
+        size === "sm" && "h-9 w-9 text-sm",
+        size === "md" && "h-11 w-11 text-base",
+        size === "lg" && "h-14 w-14 text-xl",
+      )}
+      style={{ background: `linear-gradient(135deg, ${asset.color}, ${asset.color}99)` }}
+    >
+      <span className="text-white drop-shadow-sm">{asset.icon}</span>
     </div>
   );
+}
+
+function SectionTitle({ eyebrow, title, action, onAction }: { eyebrow?: string; title: string; action?: string; onAction?: () => void }) {
+  return (
+    <div className="mb-4 flex items-end justify-between gap-4">
+      <div>
+        {eyebrow && <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-500">{eyebrow}</p>}
+        <h2 className="font-display text-xl font-semibold tracking-[-0.03em] text-white sm:text-2xl">{title}</h2>
+      </div>
+      {action && <button onClick={onAction} className="text-xs font-semibold text-[#b7f397] transition hover:text-white">{action} <span className="ml-1">→</span></button>}
+    </div>
+  );
+}
+
+function WalletCard({ hidden, onToggle, onAction }: { hidden: boolean; onToggle: () => void; onAction: (modal: Modal) => void }) {
+  return (
+    <div className="relative overflow-hidden rounded-[26px] bg-[#18242c] p-5 shadow-[0_20px_60px_rgba(0,0,0,.22)] sm:p-7">
+      <div className="pointer-events-none absolute -right-24 -top-32 h-80 w-80 rounded-full bg-[#b7f397]/10 blur-3xl" />
+      <div className="pointer-events-none absolute bottom-[-50px] left-[-30px] h-44 w-44 rounded-full bg-[#7ee9c4]/10 blur-3xl" />
+      <div className="relative flex items-start justify-between">
+        <div>
+          <div className="flex items-center gap-2 text-sm text-slate-400"><span className="grid h-6 w-6 place-items-center rounded-full bg-[#b7f397]/15 text-[#b7f397]"><WalletCards size={13} /></span> Total balance</div>
+          <div className="mt-3 flex items-center gap-3">
+            <p className="font-display text-[clamp(2.2rem,6vw,3.5rem)] font-semibold leading-none tracking-[-0.07em] text-white">{hidden ? "••••••" : "$47,284.82"}</p>
+            <button onClick={onToggle} className="rounded-full p-2 text-slate-400 transition hover:bg-white/10 hover:text-white" aria-label={hidden ? "Show balance" : "Hide balance"}>{hidden ? <EyeOff size={17} /> : <Eye size={17} />}</button>
+          </div>
+          <div className="mt-3 flex items-center gap-2 text-sm"><span className="rounded-full bg-[#b7f397]/12 px-2 py-1 font-semibold text-[#b7f397]">+8.42%</span><span className="text-slate-400">+$3,671.10 this month</span></div>
+        </div>
+        <div className="hidden h-9 w-9 place-items-center rounded-full border border-white/10 bg-white/5 text-slate-400 sm:grid"><MoreHorizontal size={18} /></div>
+      </div>
+      <div className="relative mt-8 h-20 w-full overflow-hidden sm:mt-10 sm:h-24">
+        <svg viewBox="0 0 640 120" className="h-full w-full" preserveAspectRatio="none" aria-label="Portfolio performance chart">
+          <defs><linearGradient id="area" x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stopColor="#b7f397" stopOpacity=".26" /><stop offset="100%" stopColor="#b7f397" stopOpacity="0" /></linearGradient></defs>
+          <path d="M0 93 C34 90 41 78 70 84 S115 95 138 70 S172 85 195 60 S234 66 256 46 S286 76 311 56 S346 38 367 50 S402 33 425 39 S459 49 478 22 S525 43 548 20 S580 28 640 9 L640 120 L0 120Z" fill="url(#area)" />
+          <path d="M0 93 C34 90 41 78 70 84 S115 95 138 70 S172 85 195 60 S234 66 256 46 S286 76 311 56 S346 38 367 50 S402 33 425 39 S459 49 478 22 S525 43 548 20 S580 28 640 9" fill="none" stroke="#b7f397" strokeLinecap="round" strokeWidth="3" />
+          <circle cx="548" cy="20" r="5" fill="#b7f397" stroke="#18242c" strokeWidth="4" />
+        </svg>
+      </div>
+      <div className="relative mt-4 flex flex-wrap gap-2 border-t border-white/10 pt-4 sm:gap-3">
+        <ActionButton icon={ArrowUpRight} label="Send" onClick={() => onAction("send")} />
+        <ActionButton icon={ArrowDownLeft} label="Receive" onClick={() => onAction("receive")} />
+        <ActionButton icon={ArrowLeftRight} label="Swap" onClick={() => onAction("swap")} />
+        <ActionButton icon={Plus} label="Buy" onClick={() => onAction("buy")} />
+      </div>
+    </div>
+  );
+}
+
+function ActionButton({ icon: Icon, label, onClick }: { icon: LucideIcon; label: string; onClick: () => void }) {
+  return <button onClick={onClick} className="flex min-w-[62px] flex-1 items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-semibold text-slate-200 transition hover:bg-white/10 hover:text-[#b7f397] active:scale-[.97] sm:min-w-0"><span className="grid h-7 w-7 place-items-center rounded-full bg-white/[.08] text-[#b7f397]"><Icon size={14} /></span>{label}</button>;
+}
+
+function ActivityRow({ item }: { item: (typeof activity)[number] }) {
+  const Icon = item.icon;
+  return <div className="flex items-center gap-3 border-b border-white/[.07] py-4 last:border-0"><div className="relative"><div className="grid h-10 w-10 place-items-center rounded-full" style={{ backgroundColor: `${item.color}20`, color: item.color }}><Icon size={17} /></div><span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-[#0e151c] bg-[#b7f397]" /></div><div className="min-w-0 flex-1"><div className="flex items-center justify-between gap-3"><p className="truncate text-sm font-semibold text-slate-100">{item.title}</p><p className={cx("shrink-0 text-sm font-semibold", item.type === "Sent" ? "text-slate-200" : "text-[#b7f397]")}>{item.amount}</p></div><div className="mt-1 flex items-center justify-between gap-3"><p className="truncate text-xs text-slate-500">{item.detail}</p><p className="shrink-0 text-xs text-slate-500">{item.value}</p></div></div></div>;
+}
+
+function Overview({ hidden, onToggle, onAction, onTab, onAsset }: { hidden: boolean; onToggle: () => void; onAction: (modal: Modal) => void; onTab: (tab: Tab) => void; onAsset: (asset: Asset) => void }) {
+  return <>
+    <div className="grid gap-5 xl:grid-cols-[minmax(0,1.45fr)_minmax(300px,.75fr)]">
+      <WalletCard hidden={hidden} onToggle={onToggle} onAction={onAction} />
+      <div className="hidden rounded-[26px] border border-white/[.08] bg-white/[.035] p-6 xl:block">
+        <div className="flex items-center justify-between"><p className="text-[10px] font-semibold uppercase tracking-[.22em] text-slate-500">Daily brief</p><span className="grid h-8 w-8 place-items-center rounded-full bg-[#b7f397]/10 text-[#b7f397]"><Sparkles size={15} /></span></div>
+        <h3 className="mt-5 max-w-[220px] font-display text-2xl font-semibold leading-tight tracking-[-.04em] text-white">Markets are feeling <span className="text-[#b7f397]">optimistic.</span></h3>
+        <p className="mt-3 text-sm leading-6 text-slate-400">Your portfolio is up 8.42% this month. Bitcoin dominance is holding above 52%.</p>
+        <div className="mt-6 flex items-center gap-2 text-xs font-semibold text-slate-300"><span className="h-2 w-2 rounded-full bg-[#b7f397]" /> Updated 3 mins ago <ArrowRight size={13} className="text-slate-500" /></div>
+      </div>
+    </div>
+
+    <div className="mt-8"><SectionTitle title="Your assets" action="View all" onAction={() => onTab("assets")} /><div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{assets.slice(0, 4).map((asset) => <button key={asset.id} onClick={() => onAsset(asset)} className="group rounded-2xl border border-white/[.08] bg-white/[.035] p-4 text-left transition duration-200 hover:-translate-y-0.5 hover:border-[#b7f397]/30 hover:bg-white/[.06]"><div className="flex items-center justify-between"><TokenIcon asset={asset} size="sm" /><span className={cx("text-xs font-semibold", asset.positive ? "text-[#b7f397]" : "text-rose-300")}>{asset.change}</span></div><div className="mt-5"><p className="text-sm font-semibold text-white">{asset.name}</p><p className="mt-1 text-xs text-slate-500">{asset.amount}</p></div><div className="mt-4 flex items-end justify-between"><p className="text-sm font-semibold text-slate-100">{hidden ? "••••" : asset.value}</p><p className="text-[11px] text-slate-500">{asset.symbol}</p></div></button>)}</div></div>
+
+    <div className="mt-8 grid gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(280px,.72fr)]"><div><SectionTitle title="Recent activity" action="See all" onAction={() => onTab("activity")} /><div className="rounded-2xl border border-white/[.08] bg-white/[.025] px-4">{activity.slice(0, 3).map((item) => <ActivityRow key={item.title} item={item} />)}</div></div><div><SectionTitle title="Market pulse" action="Explore" onAction={() => onTab("assets")} /><div className="rounded-2xl border border-white/[.08] bg-white/[.025] p-4">{assets.slice(0, 3).map((asset, index) => <div key={asset.id} className="flex items-center gap-3 border-b border-white/[.07] py-3.5 last:border-0"><TokenIcon asset={asset} size="sm" /><div className="min-w-0 flex-1"><p className="text-sm font-semibold text-white">{asset.name}</p><p className="text-xs text-slate-500">{asset.symbol}/USD</p></div><div className="text-right"><p className="text-sm font-semibold text-slate-100">{asset.price}</p><p className="mt-0.5 text-xs text-[#b7f397]">{asset.change}</p></div><span className="text-xs text-slate-600">0{index + 1}</span></div>)}</div></div></div>
+  </>;
+}
+
+function AssetsPage({ onAsset, hidden, onAction }: { onAsset: (asset: Asset) => void; hidden: boolean; onAction: (modal: Modal) => void }) {
+  const [query, setQuery] = useState("");
+  const filtered = useMemo(() => assets.filter((asset) => `${asset.name} ${asset.symbol}`.toLowerCase().includes(query.toLowerCase())), [query]);
+  return <div className="animate-enter"><div className="mb-7 flex flex-col justify-between gap-4 sm:flex-row sm:items-end"><div><p className="text-[10px] font-semibold uppercase tracking-[.22em] text-slate-500">Portfolio</p><h1 className="mt-2 font-display text-3xl font-semibold tracking-[-.05em] text-white sm:text-4xl">My assets</h1><p className="mt-2 text-sm text-slate-400">Everything you hold, in one calm view.</p></div><button onClick={() => toast.success("Asset discovery opened", { description: "Choose a token to add to your watchlist." })} className="flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[.06] px-4 py-3 text-sm font-semibold text-white transition hover:border-[#b7f397]/40 hover:text-[#b7f397]"><Plus size={16} /> Add asset</button></div><div className="mb-5 flex flex-col gap-3 sm:flex-row"><label className="relative flex-1"><Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={17} /><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search assets" className="w-full rounded-xl border border-white/10 bg-white/[.045] py-3 pl-11 pr-4 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-[#b7f397]/50" /></label><button onClick={() => toast.info("Filters are ready", { description: "Sort and hide zero-balance assets in the next release." })} className="flex items-center justify-center gap-2 rounded-xl border border-white/10 px-4 py-3 text-sm font-semibold text-slate-300 transition hover:bg-white/[.06] hover:text-white"><SlidersHorizontal size={16} /> Filters</button></div><div className="overflow-hidden rounded-2xl border border-white/[.08] bg-white/[.025]"><div className="hidden grid-cols-[minmax(220px,1.5fr)_1fr_1fr_1fr_auto] gap-4 border-b border-white/[.08] px-5 py-3 text-[10px] font-semibold uppercase tracking-[.16em] text-slate-600 sm:grid"><span>Asset</span><span>Price</span><span>Balance</span><span>24h change</span><span /></div>{filtered.map((asset) => <button key={asset.id} onClick={() => onAsset(asset)} className="grid w-full grid-cols-[minmax(0,1fr)_auto] gap-4 border-b border-white/[.07] px-4 py-4 text-left transition last:border-0 hover:bg-white/[.05] sm:grid-cols-[minmax(220px,1.5fr)_1fr_1fr_1fr_auto] sm:items-center sm:px-5"><div className="flex min-w-0 items-center gap-3"><TokenIcon asset={asset} size="sm" /><div className="min-w-0"><p className="truncate text-sm font-semibold text-white">{asset.name}</p><p className="mt-0.5 text-xs text-slate-500">{asset.symbol}</p></div></div><div className="hidden text-sm text-slate-300 sm:block">{asset.price}</div><div className="text-right sm:text-left"><p className="text-sm font-semibold text-white">{hidden ? "••••" : asset.value}</p><p className="mt-0.5 text-xs text-slate-500 sm:hidden">{asset.amount}</p></div><div className={cx("hidden text-sm font-semibold sm:block", asset.positive ? "text-[#b7f397]" : "text-rose-300")}>{asset.change}</div><ChevronRight className="hidden text-slate-600 sm:block" size={17} /></button>)}{filtered.length === 0 && <div className="px-5 py-12 text-center text-sm text-slate-500">No assets match “{query}”.</div>}</div><div className="mt-4 flex items-center gap-2 rounded-xl border border-[#b7f397]/10 bg-[#b7f397]/[.04] px-4 py-3 text-xs text-slate-400"><ShieldCheck size={15} className="text-[#b7f397]" /> Balances are shown in demo mode. Your recovery phrase never leaves your device.</div><div className="mt-8"><SectionTitle title="Watchlist" /><div className="grid gap-3 sm:grid-cols-3"><div className="rounded-2xl border border-dashed border-white/15 p-4"><Star size={18} className="text-[#b7f397]" /><p className="mt-5 text-sm font-semibold text-white">Track what matters</p><p className="mt-1 text-xs leading-5 text-slate-500">Add assets to your watchlist for a quick market pulse.</p></div>{assets.slice(2, 4).map((asset) => <button key={asset.id} onClick={() => onAsset(asset)} className="rounded-2xl border border-white/[.08] bg-white/[.025] p-4 text-left transition hover:bg-white/[.06]"><div className="flex items-center justify-between"><TokenIcon asset={asset} size="sm" /><Star size={15} className="fill-[#b7f397] text-[#b7f397]" /></div><p className="mt-5 text-sm font-semibold text-white">{asset.name}</p><p className="mt-1 text-xs text-[#b7f397]">{asset.price} · {asset.change}</p></button>)}</div></div></div>;
+}
+
+function SwapPage({ onClose }: { onClose?: () => void }) {
+  const [from, setFrom] = useState("0.00");
+  const [toAsset, setToAsset] = useState("USDC");
+  const [quote, setQuote] = useState(false);
+  return <div className="mx-auto max-w-xl animate-enter"><div className="mb-7"><p className="text-[10px] font-semibold uppercase tracking-[.22em] text-slate-500">Trade instantly</p><h1 className="mt-2 font-display text-3xl font-semibold tracking-[-.05em] text-white sm:text-4xl">Swap assets</h1><p className="mt-2 text-sm text-slate-400">Find your best route across 12 networks.</p></div><div className="rounded-[26px] border border-white/[.09] bg-white/[.035] p-4 shadow-[0_20px_70px_rgba(0,0,0,.18)] sm:p-6"><div className="flex items-center justify-between px-1 pb-3"><span className="text-xs font-semibold uppercase tracking-[.16em] text-slate-500">You pay</span><button onClick={() => setFrom("0.3681")} className="text-xs font-semibold text-[#b7f397]">Max</button></div><div className="rounded-2xl border border-white/10 bg-[#111922] p-4"><div className="flex items-center justify-between"><input value={from} onChange={(e) => setFrom(e.target.value)} className="w-1/2 bg-transparent text-3xl font-semibold tracking-[-.05em] text-white outline-none" /><button className="flex items-center gap-2 rounded-full border border-white/10 bg-white/[.07] px-3 py-2 text-sm font-semibold text-white"><TokenIcon asset={assets[0]} size="sm" /> BTC <ChevronDown size={14} /></button></div><p className="mt-2 text-xs text-slate-500">Balance: 0.3681 BTC · $25,184.60</p></div><div className="relative z-10 -my-3 flex justify-center"><button onClick={() => toast.info("Pair switched")} className="grid h-10 w-10 place-items-center rounded-xl border-4 border-[#18212b] bg-[#b7f397] text-[#10181b] transition hover:rotate-180"><ArrowDownLeft size={16} /></button></div><div className="flex items-center justify-between px-1 pb-3 pt-4"><span className="text-xs font-semibold uppercase tracking-[.16em] text-slate-500">You receive</span><span className="text-xs text-slate-500">Estimated</span></div><div className="rounded-2xl border border-white/10 bg-[#111922] p-4"><div className="flex items-center justify-between"><p className="text-3xl font-semibold tracking-[-.05em] text-white">{from === "0.00" ? "0.00" : "25,198.34"}</p><button onClick={() => setToAsset(toAsset === "USDC" ? "ETH" : "USDC")} className="flex items-center gap-2 rounded-full border border-white/10 bg-white/[.07] px-3 py-2 text-sm font-semibold text-white"><TokenIcon asset={toAsset === "USDC" ? assets[3] : assets[1]} size="sm" /> {toAsset} <ChevronDown size={14} /></button></div><p className="mt-2 text-xs text-slate-500">1 BTC ≈ 68,432.18 USDC · Rate refreshes every 30 sec</p></div><div className="mt-5 space-y-3 rounded-xl bg-white/[.035] p-4 text-xs"><div className="flex justify-between"><span className="text-slate-500">Network fee</span><span className="font-medium text-slate-300">$1.42</span></div><div className="flex justify-between"><span className="text-slate-500">Route</span><span className="font-medium text-slate-300">Trustee routing · Best price</span></div><div className="flex justify-between"><span className="text-slate-500">Price impact</span><span className="font-medium text-[#b7f397]">&lt; 0.01%</span></div></div><button onClick={() => { setQuote(true); toast.success("Quote locked", { description: "Your rate is reserved for 30 seconds." }); }} className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl bg-[#b7f397] py-3.5 text-sm font-bold text-[#102018] transition hover:bg-[#c9ffa9] active:scale-[.98]">{quote ? <><Check size={17} /> Quote locked · Swap now</> : <>Review swap <ArrowRight size={17} /></>}</button></div><div className="mt-4 flex items-center justify-center gap-2 text-xs text-slate-600"><LockKeyhole size={13} /> Non-custodial · You stay in control</div></div>;
+}
+
+function BuyPage() {
+  const [selected, setSelected] = useState("BTC");
+  const [amount, setAmount] = useState("500");
+  const selectedAsset = assets.find((a) => a.symbol === selected) ?? assets[0];
+  return <div className="mx-auto max-w-4xl animate-enter"><div className="mb-7"><p className="text-[10px] font-semibold uppercase tracking-[.22em] text-slate-500">Get started</p><h1 className="mt-2 font-display text-3xl font-semibold tracking-[-.05em] text-white sm:text-4xl">Buy crypto</h1><p className="mt-2 text-sm text-slate-400">Simple, secure, and directly in your wallet.</p></div><div className="grid gap-5 lg:grid-cols-[1.05fr_.95fr]"><div className="rounded-[26px] border border-white/[.09] bg-white/[.035] p-5 sm:p-7"><div className="flex items-center justify-between"><div><p className="text-xs font-semibold uppercase tracking-[.16em] text-slate-500">I want to buy</p><p className="mt-2 text-sm text-slate-300">Choose an asset</p></div><span className="grid h-9 w-9 place-items-center rounded-full bg-[#b7f397]/10 text-[#b7f397]"><Zap size={16} /></span></div><div className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-4">{assets.slice(0, 4).map((asset) => <button key={asset.symbol} onClick={() => setSelected(asset.symbol)} className={cx("rounded-xl border p-3 text-left transition", selected === asset.symbol ? "border-[#b7f397] bg-[#b7f397]/10" : "border-white/[.08] bg-white/[.025] hover:bg-white/[.06]")}><TokenIcon asset={asset} size="sm" /><p className="mt-3 text-xs font-semibold text-white">{asset.symbol}</p></button>)}</div><div className="mt-7 flex items-center justify-between"><label className="text-xs font-semibold uppercase tracking-[.16em] text-slate-500">Amount</label><span className="text-xs text-slate-500">USD</span></div><div className="mt-3 flex items-center rounded-2xl border border-white/10 bg-[#111922] px-4 py-3"><span className="text-2xl text-slate-500">$</span><input value={amount} onChange={(e) => setAmount(e.target.value)} className="min-w-0 flex-1 bg-transparent px-2 text-3xl font-semibold tracking-[-.05em] text-white outline-none" /><span className="rounded-lg bg-white/[.07] px-2 py-1 text-xs font-semibold text-slate-300">USD</span></div><div className="mt-3 grid grid-cols-4 gap-2">{["100", "250", "500", "1000"].map((value) => <button key={value} onClick={() => setAmount(value)} className="rounded-lg border border-white/[.08] py-2 text-xs font-semibold text-slate-400 transition hover:border-[#b7f397]/40 hover:text-[#b7f397]">${value}</button>)}</div><button onClick={() => toast.success("Purchase flow ready", { description: `Buying ${selected} with your selected payment method.` })} className="mt-7 w-full rounded-xl bg-[#b7f397] py-3.5 text-sm font-bold text-[#102018] transition hover:bg-[#c9ffa9] active:scale-[.98]">Continue with {selectedAsset.name}</button></div><div className="rounded-[26px] bg-gradient-to-br from-[#254d49] via-[#152c33] to-[#101822] p-6 sm:p-7"><div className="flex items-center gap-2 text-xs font-semibold text-[#b7f397]"><ShieldCheck size={15} /> Trusted by 2M+ wallet users</div><h2 className="mt-20 max-w-[270px] font-display text-3xl font-semibold leading-[1.05] tracking-[-.05em] text-white sm:mt-28">A safer way to step into crypto.</h2><p className="mt-4 max-w-[300px] text-sm leading-6 text-slate-300">Pay with Apple Pay, Google Pay, or card. Your assets arrive directly in your non-custodial wallet.</p><div className="mt-8 flex items-center gap-2 text-xs text-slate-400"><LockKeyhole size={14} className="text-[#b7f397]" /> Secure checkout · No hidden fees</div></div></div></div>;
+}
+
+function ActivityPage() { return <div className="mx-auto max-w-3xl animate-enter"><div className="mb-7"><p className="text-[10px] font-semibold uppercase tracking-[.22em] text-slate-500">Your ledger</p><h1 className="mt-2 font-display text-3xl font-semibold tracking-[-.05em] text-white sm:text-4xl">Activity</h1><p className="mt-2 text-sm text-slate-400">A clear record of every move.</p></div><div className="mb-5 flex gap-2 overflow-x-auto pb-1">{["All activity", "Sent", "Received", "Swapped"].map((label, i) => <button key={label} onClick={() => toast.info(`${label} filter selected`)} className={cx("whitespace-nowrap rounded-full border px-4 py-2 text-xs font-semibold transition", i === 0 ? "border-[#b7f397] bg-[#b7f397]/10 text-[#b7f397]" : "border-white/10 text-slate-400 hover:text-white")}>{label}</button>)}</div><div className="rounded-2xl border border-white/[.08] bg-white/[.025] px-4 sm:px-6">{activity.map((item) => <ActivityRow key={item.title} item={item} />)}</div><div className="mt-5 flex items-start gap-3 rounded-2xl border border-white/[.08] bg-white/[.025] p-4 text-xs text-slate-500"><CircleHelp size={15} className="mt-0.5 shrink-0 text-slate-400" /><p>Activity is synced from your local wallet. Network confirmations can take a few minutes to appear.</p></div></div>; }
+
+function SettingsPage() { const [biometric, setBiometric] = useState(true); const [notifications, setNotifications] = useState(true); return <div className="mx-auto max-w-3xl animate-enter"><div className="mb-7"><p className="text-[10px] font-semibold uppercase tracking-[.22em] text-slate-500">Your wallet</p><h1 className="mt-2 font-display text-3xl font-semibold tracking-[-.05em] text-white sm:text-4xl">Settings</h1><p className="mt-2 text-sm text-slate-400">Make Trustee feel like yours.</p></div><div className="overflow-hidden rounded-2xl border border-white/[.08] bg-white/[.025]"><div className="flex items-center gap-4 border-b border-white/[.08] p-5"><div className="grid h-12 w-12 place-items-center rounded-2xl bg-[#b7f397] text-lg font-bold text-[#102018]">JD</div><div className="min-w-0 flex-1"><p className="font-semibold text-white">Jordan Davis</p><p className="mt-1 truncate text-xs text-slate-500">Wallet 1 · 0x7B3...4A91</p></div><button onClick={() => toast.info("Profile editing is coming soon")} className="rounded-lg border border-white/10 px-3 py-2 text-xs font-semibold text-slate-300 hover:text-white">Edit</button></div><SettingRow icon={ShieldCheck} title="Security center" detail="Passcode, biometrics & recovery phrase" onClick={() => toast.info("Security center opened")} /><SettingRow icon={Globe2} title="Network preferences" detail="12 networks enabled" onClick={() => toast.info("Network preferences opened")} /><SettingToggle icon={LockKeyhole} title="Biometric unlock" detail="Use Face ID or fingerprint to unlock" value={biometric} onChange={() => setBiometric(!biometric)} /><SettingToggle icon={Bell} title="Price alerts" detail="Get notified about market movements" value={notifications} onChange={() => setNotifications(!notifications)} /><SettingRow icon={Settings2} title="App preferences" detail="Currency, language, appearance" onClick={() => toast.info("App preferences opened")} /><SettingRow icon={CircleHelp} title="Help & support" detail="Guides, FAQs and contact" onClick={() => toast.info("Support center opened")} /></div><button onClick={() => toast.success("Wallet is already backed up", { description: "Your recovery phrase is safely stored offline." })} className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl border border-[#b7f397]/20 bg-[#b7f397]/[.06] py-3.5 text-sm font-semibold text-[#b7f397] transition hover:bg-[#b7f397]/10"><ShieldCheck size={17} /> Wallet backup status: protected</button><p className="mt-6 text-center text-[11px] text-slate-600">Trustee Wallet Web · v1.0.0 · Demo mode</p></div>; }
+
+function SettingRow({ icon: Icon, title, detail, onClick }: { icon: LucideIcon; title: string; detail: string; onClick: () => void }) { return <button onClick={onClick} className="flex w-full items-center gap-4 border-b border-white/[.07] p-5 text-left transition last:border-0 hover:bg-white/[.045]"><span className="grid h-10 w-10 place-items-center rounded-xl bg-white/[.06] text-slate-300"><Icon size={17} /></span><span className="min-w-0 flex-1"><span className="block text-sm font-semibold text-white">{title}</span><span className="mt-1 block text-xs text-slate-500">{detail}</span></span><ChevronRight size={17} className="text-slate-600" /></button>; }
+function SettingToggle({ icon: Icon, title, detail, value, onChange }: { icon: LucideIcon; title: string; detail: string; value: boolean; onChange: () => void }) { return <button onClick={onChange} className="flex w-full items-center gap-4 border-b border-white/[.07] p-5 text-left transition hover:bg-white/[.045]"><span className="grid h-10 w-10 place-items-center rounded-xl bg-white/[.06] text-slate-300"><Icon size={17} /></span><span className="min-w-0 flex-1"><span className="block text-sm font-semibold text-white">{title}</span><span className="mt-1 block text-xs text-slate-500">{detail}</span></span><span className={cx("relative h-6 w-11 rounded-full transition", value ? "bg-[#b7f397]" : "bg-white/15")}><span className={cx("absolute top-1 h-4 w-4 rounded-full transition", value ? "left-6 bg-[#102018]" : "left-1 bg-slate-400")} /></span></button>; }
+
+function ModalShell({ title, eyebrow, children, onClose }: { title: string; eyebrow?: string; children: React.ReactNode; onClose: () => void }) { return <div className="fixed inset-0 z-50 flex items-end justify-center bg-[#030609]/70 p-0 backdrop-blur-sm sm:items-center sm:p-4" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}><div className="animate-modal max-h-[92vh] w-full overflow-y-auto rounded-t-[28px] border border-white/10 bg-[#121b24] p-5 shadow-[0_30px_100px_rgba(0,0,0,.5)] sm:max-w-md sm:rounded-[28px] sm:p-7"><div className="mb-6 flex items-start justify-between"><div><p className="text-[10px] font-semibold uppercase tracking-[.22em] text-[#b7f397]">{eyebrow ?? "Trustee wallet"}</p><h2 className="mt-2 font-display text-2xl font-semibold tracking-[-.04em] text-white">{title}</h2></div><button onClick={onClose} className="grid h-9 w-9 place-items-center rounded-full bg-white/[.06] text-slate-400 transition hover:bg-white/10 hover:text-white"><X size={17} /></button></div>{children}</div></div>; }
+
+function SendModal({ onClose }: { onClose: () => void }) { const [address, setAddress] = useState(""); const [amount, setAmount] = useState(""); const [review, setReview] = useState(false); return <ModalShell title={review ? "Confirm transfer" : "Send crypto"} eyebrow={review ? "Review details" : "Move funds"} onClose={onClose}>{review ? <div><div className="rounded-2xl bg-white/[.045] p-4"><p className="text-xs text-slate-500">You are sending</p><p className="mt-2 text-3xl font-semibold text-white">{amount || "0.00"} ETH</p><p className="mt-4 text-xs text-slate-500">To</p><p className="mt-1 break-all text-sm text-slate-200">{address}</p></div><div className="mt-4 space-y-3 text-xs"><div className="flex justify-between"><span className="text-slate-500">Network fee</span><span className="text-slate-300">$0.84</span></div><div className="flex justify-between"><span className="text-slate-500">Arrival</span><span className="text-slate-300">~30 seconds</span></div></div><button onClick={() => { toast.success("Transfer submitted", { description: "Your transaction is pending confirmation." }); onClose(); }} className="mt-7 w-full rounded-xl bg-[#b7f397] py-3.5 text-sm font-bold text-[#102018]">Confirm & send</button><button onClick={() => setReview(false)} className="mt-2 w-full py-3 text-sm font-semibold text-slate-400 hover:text-white">Edit details</button></div> : <div><label className="text-xs font-semibold text-slate-400">Recipient address</label><div className="relative mt-2"><input value={address} onChange={(e) => setAddress(e.target.value)} placeholder="0x, bc1, or ENS name" className="w-full rounded-xl border border-white/10 bg-[#0d151d] px-4 py-3.5 pr-12 text-sm text-white outline-none placeholder:text-slate-600 focus:border-[#b7f397]/50" /><button onClick={() => toast.info("QR scanner opened")} className="absolute right-2 top-2 grid h-9 w-9 place-items-center rounded-lg bg-white/[.06] text-slate-400 hover:text-[#b7f397]"><QrCode size={17} /></button></div><label className="mt-5 block text-xs font-semibold text-slate-400">Amount</label><div className="mt-2 flex items-center rounded-xl border border-white/10 bg-[#0d151d] px-4 py-3.5"><input value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0.00" className="min-w-0 flex-1 bg-transparent text-xl font-semibold text-white outline-none placeholder:text-slate-600" /><span className="text-xs font-semibold text-slate-400">ETH</span></div><p className="mt-2 text-xs text-slate-600">Available: 3.244 ETH</p><button disabled={!address || !amount} onClick={() => setReview(true)} className="mt-7 w-full rounded-xl bg-[#b7f397] py-3.5 text-sm font-bold text-[#102018] transition disabled:cursor-not-allowed disabled:opacity-40">Review transfer</button><p className="mt-4 flex items-center justify-center gap-2 text-[11px] text-slate-600"><LockKeyhole size={12} /> You’ll review everything before it’s sent</p></div>}</ModalShell>; }
+
+function ReceiveModal({ onClose }: { onClose: () => void }) { const address = "0x7B3a...4A91"; return <ModalShell title="Receive crypto" eyebrow="Your wallet address" onClose={onClose}><div className="mx-auto grid h-44 w-44 place-items-center rounded-2xl bg-white p-4"><div className="grid h-full w-full grid-cols-9 grid-rows-9 gap-1 opacity-90">{Array.from({ length: 81 }, (_, i) => <span key={i} className={cx("rounded-[1px]", (i * 13 + i * i) % 7 < 3 ? "bg-[#111922]" : "bg-transparent")} />)}</div></div><p className="mt-6 text-center text-sm text-slate-400">Scan to send funds to this wallet</p><button onClick={() => { navigator.clipboard?.writeText("0x7B3a42D1d7aA2cE98c9f6e0a4A91"); toast.success("Address copied"); }} className="mt-5 flex w-full items-center justify-between rounded-xl border border-white/10 bg-[#0d151d] px-4 py-3.5 text-left transition hover:border-[#b7f397]/40"><span><span className="block text-[10px] font-semibold uppercase tracking-[.16em] text-slate-500">Ethereum address</span><span className="mt-1 block text-sm font-semibold text-white">{address}</span></span><Copy size={16} className="text-[#b7f397]" /></button><p className="mt-4 text-center text-[11px] leading-5 text-slate-600">Only send assets on the Ethereum network to this address.</p></ModalShell>; }
+
+function AssetModal({ asset, onClose, onAction }: { asset: Asset; onClose: () => void; onAction: (modal: Modal) => void }) { return <ModalShell title={`${asset.name} (${asset.symbol})`} eyebrow="Asset details" onClose={onClose}><div className="flex items-center gap-3"><TokenIcon asset={asset} size="lg" /><div><p className="text-2xl font-semibold text-white">{asset.price}</p><p className="mt-1 text-sm text-[#b7f397]">{asset.change} today</p></div></div><div className="mt-6 h-28 rounded-xl bg-white/[.035] p-2"><svg viewBox="0 0 400 100" className="h-full w-full" preserveAspectRatio="none"><path d="M0 78 C36 74 53 84 76 65 S119 75 148 50 S181 67 201 44 S240 53 266 36 S302 52 329 23 S369 31 400 12" fill="none" stroke={asset.color} strokeLinecap="round" strokeWidth="3" /></svg></div><div className="mt-5 grid grid-cols-2 gap-3"><div className="rounded-xl bg-white/[.045] p-3"><p className="text-xs text-slate-500">Your balance</p><p className="mt-2 text-sm font-semibold text-white">{asset.amount}</p></div><div className="rounded-xl bg-white/[.045] p-3"><p className="text-xs text-slate-500">Value</p><p className="mt-2 text-sm font-semibold text-white">{asset.value}</p></div></div><div className="mt-5 grid grid-cols-2 gap-3"><button onClick={() => onAction("send")} className="rounded-xl border border-white/10 py-3 text-sm font-semibold text-white transition hover:bg-white/[.06]">Send</button><button onClick={() => onAction("receive")} className="rounded-xl bg-[#b7f397] py-3 text-sm font-bold text-[#102018] transition hover:bg-[#c9ffa9]">Receive</button></div></ModalShell>; }
+
+export default function Home() {
+  const [tab, setTab] = useState<Tab>("overview");
+  const [hidden, setHidden] = useState(false);
+  const [modal, setModal] = useState<Modal>(null);
+  const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const openAction = (next: Modal) => { setSelectedAsset(null); setModal(next); };
+  const openAsset = (asset: Asset) => { setSelectedAsset(asset); setModal("asset"); };
+  const selectTab = (next: Tab) => { setTab(next); setSidebarOpen(false); window.scrollTo({ top: 0, behavior: "smooth" }); };
+  const pageTitle = navItems.find((item) => item.id === tab)?.label ?? "Overview";
+  return <div className="min-h-screen bg-[#080d13] text-slate-100"><div className="pointer-events-none fixed inset-0 overflow-hidden"><div className="absolute -left-40 -top-40 h-[520px] w-[520px] rounded-full bg-[#1d5d54]/10 blur-[120px]" /><div className="absolute -bottom-64 -right-40 h-[500px] w-[500px] rounded-full bg-[#324d78]/10 blur-[120px]" /></div><div className="relative flex min-h-screen"><aside className={cx("fixed inset-y-0 left-0 z-40 flex w-[264px] flex-col border-r border-white/[.07] bg-[#0b1219]/95 px-5 py-6 backdrop-blur-xl transition-transform duration-200 lg:static lg:translate-x-0", sidebarOpen ? "translate-x-0" : "-translate-x-full")}><div className="flex items-center gap-3 px-2"><div className="grid h-9 w-9 place-items-center rounded-xl bg-[#b7f397] text-[#102018] shadow-[0_0_24px_rgba(183,243,151,.18)]"><span className="font-display text-lg font-bold">T</span></div><div><p className="font-display text-[17px] font-semibold tracking-[-.04em] text-white">trustee</p><p className="text-[9px] font-semibold uppercase tracking-[.18em] text-slate-500">wallet web</p></div></div><div className="mt-12 flex-1"><p className="px-3 text-[10px] font-semibold uppercase tracking-[.2em] text-slate-600">Wallet</p><nav className="mt-4 space-y-1">{navItems.map(({ id, label, icon: Icon }) => <button key={id} onClick={() => selectTab(id)} className={cx("group flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-semibold transition", tab === id ? "bg-[#b7f397]/10 text-[#b7f397]" : "text-slate-500 hover:bg-white/[.045] hover:text-slate-200")}><Icon size={18} className={cx("transition", tab === id ? "text-[#b7f397]" : "text-slate-500 group-hover:text-slate-300")} />{label}{id === "activity" && <span className="ml-auto h-2 w-2 rounded-full bg-[#b7f397]" />}</button>)}</nav><div className="mt-10 px-3"><p className="text-[10px] font-semibold uppercase tracking-[.2em] text-slate-600">Workspace</p><button onClick={() => toast.info("Wallet manager opened")} className="mt-4 flex w-full items-center gap-3 rounded-xl py-3 text-sm font-semibold text-slate-500 transition hover:text-white"><Settings2 size={18} /> Manage wallets <ChevronRight size={15} className="ml-auto" /></button></div></div><div className="rounded-2xl border border-[#b7f397]/10 bg-[#b7f397]/[.04] p-4"><div className="flex items-center gap-2 text-xs font-semibold text-[#b7f397]"><ShieldCheck size={14} /> Self-custody, always</div><p className="mt-2 text-[11px] leading-5 text-slate-500">Your keys. Your crypto. Back up your recovery phrase to stay protected.</p><button onClick={() => toast.success("Security check complete")} className="mt-3 text-xs font-semibold text-white hover:text-[#b7f397]">Check security <ArrowRight size={12} className="ml-1 inline" /></button></div></aside>{sidebarOpen && <button aria-label="Close navigation" onClick={() => setSidebarOpen(false)} className="fixed inset-0 z-30 bg-black/60 lg:hidden" />}<main className="relative min-w-0 flex-1"><header className="sticky top-0 z-20 flex h-[76px] items-center justify-between border-b border-white/[.06] bg-[#080d13]/80 px-4 backdrop-blur-xl sm:px-8 lg:px-10"><div className="flex items-center gap-3"><button onClick={() => setSidebarOpen(true)} className="grid h-9 w-9 place-items-center rounded-lg bg-white/[.05] text-slate-300 lg:hidden"><Menu size={18} /></button><div className="lg:hidden"><p className="font-display text-[17px] font-semibold tracking-[-.04em] text-white">trustee</p></div><div className="hidden lg:block"><p className="text-xs font-semibold uppercase tracking-[.18em] text-slate-600">Wallet /</p><p className="mt-1 text-sm font-semibold text-slate-200">{pageTitle}</p></div></div><div className="flex items-center gap-2"><button onClick={() => toast.info("No new notifications")} className="relative grid h-9 w-9 place-items-center rounded-full text-slate-400 transition hover:bg-white/[.06] hover:text-white"><Bell size={18} /><span className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-[#b7f397]" /></button><button onClick={() => selectTab("settings")} className="grid h-9 w-9 place-items-center rounded-full bg-[#b7f397] text-xs font-bold text-[#102018] transition hover:scale-105">JD</button></div></header><div className="mx-auto max-w-[1440px] px-4 pb-28 pt-8 sm:px-8 lg:px-10 lg:pb-12 lg:pt-10">{tab === "overview" && <Overview hidden={hidden} onToggle={() => setHidden(!hidden)} onAction={openAction} onTab={selectTab} onAsset={openAsset} />}{tab === "assets" && <AssetsPage hidden={hidden} onAsset={openAsset} onAction={openAction} />}{tab === "swap" && <SwapPage />}{tab === "buy" && <BuyPage />}{tab === "activity" && <ActivityPage />}{tab === "settings" && <SettingsPage />}</div><nav className="fixed bottom-0 left-0 right-0 z-20 border-t border-white/[.08] bg-[#0b1219]/95 px-2 pb-[max(8px,env(safe-area-inset-bottom))] pt-2 backdrop-blur-xl lg:hidden"><div className="mx-auto flex max-w-lg items-center justify-around">{navItems.filter((item) => ["overview", "assets", "swap", "activity"].includes(item.id)).map(({ id, label, icon: Icon }) => <button key={id} onClick={() => selectTab(id)} className={cx("flex min-w-[64px] flex-col items-center gap-1 rounded-xl px-3 py-2 text-[10px] font-semibold transition", tab === id ? "text-[#b7f397]" : "text-slate-600")}><Icon size={18} /><span>{id === "overview" ? "Home" : id === "assets" ? "Assets" : id === "activity" ? "Activity" : label}</span></button>)}<button onClick={() => selectTab("settings")} className={cx("flex min-w-[64px] flex-col items-center gap-1 rounded-xl px-3 py-2 text-[10px] font-semibold transition", tab === "settings" ? "text-[#b7f397]" : "text-slate-600")}><Settings2 size={18} /><span>Settings</span></button></div></nav></main></div>{modal === "send" && <SendModal onClose={() => setModal(null)} />}{modal === "receive" && <ReceiveModal onClose={() => setModal(null)} />}{modal === "swap" && <ModalShell title="Swap assets" eyebrow="Trade instantly" onClose={() => setModal(null)}><SwapPage onClose={() => setModal(null)} /></ModalShell>}{modal === "buy" && <ModalShell title="Buy crypto" eyebrow="Get started" onClose={() => setModal(null)}><BuyPage /></ModalShell>}{modal === "asset" && selectedAsset && <AssetModal asset={selectedAsset} onClose={() => setModal(null)} onAction={openAction} />}</div>;
 }
